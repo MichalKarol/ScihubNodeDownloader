@@ -12,43 +12,24 @@
 
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#ifndef WIDGET_H
-#define WIDGET_H
+#ifndef AUTHDIALOG_H
+#define AUTHDIALOG_H
 
-#include "authdialog.h"
-#include "product.h"
-#include "searchtab.h"
-#include "resultstab.h"
-#include "producttab.h"
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QAuthenticator>
 #include <QtWidgets>
 
-class Widget : public QWidget
-{
+class AuthDialog : public QDialog {
     Q_OBJECT
 
 public:
-    Widget(QWidget *parent = 0);
-    void setAuth(std::pair<QString, std::pair<QByteArray *, QByteArray *>> authData);
-    ~Widget();
+    AuthDialog(QWidget* parent = 0);
+    std::pair<QString, std::pair<QByteArray*, QByteArray*>> getAuth();
 
 private:
-    QString username;
-    std::pair<QByteArray*, QByteArray*> password;
+    QLineEdit* username = nullptr;
+    QLineEdit* password = nullptr;
 
-    QTabWidget* mainTabWidget = nullptr;
-    SearchTab* searchTab = nullptr;
-
-    QNetworkAccessManager* networkAccess = nullptr;
-
-    QString getPassword();
-
-private slots:
-    void search(QString, uint, ResultsTab*);
-    void download(std::shared_ptr<Product*>);
+    QPushButton* cancel = nullptr;
+    QPushButton* apply = nullptr;
 };
 
-#endif // WIDGET_H
+#endif // AUTHDIALOG_H

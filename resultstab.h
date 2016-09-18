@@ -12,43 +12,38 @@
 
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#ifndef WIDGET_H
-#define WIDGET_H
+#ifndef RESULTSTAB_H
+#define RESULTSTAB_H
 
-#include "authdialog.h"
 #include "product.h"
-#include "searchtab.h"
-#include "resultstab.h"
-#include "producttab.h"
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QAuthenticator>
 #include <QtWidgets>
+#include <memory>
 
-class Widget : public QWidget
-{
+class ResultsTab : public QWidget {
     Q_OBJECT
-
 public:
-    Widget(QWidget *parent = 0);
-    void setAuth(std::pair<QString, std::pair<QByteArray *, QByteArray *>> authData);
-    ~Widget();
+    explicit ResultsTab(QString query, QWidget *parent = 0);
+    ~ResultsTab();
 
 private:
-    QString username;
-    std::pair<QByteArray*, QByteArray*> password;
+    QString query;
+    uint page = 0;
+    uint results = 0;
+    QXmlStreamReader reader;
+    std::vector<std::shared_ptr<Product*>> products;
 
-    QTabWidget* mainTabWidget = nullptr;
-    SearchTab* searchTab = nullptr;
+    QTreeWidget* view = nullptr;
 
-    QNetworkAccessManager* networkAccess = nullptr;
+    QPushButton* previousPage = nullptr;
+    QPushButton* nextPage = nullptr;
 
-    QString getPassword();
+public slots:
+    void updateResults(QByteArray res, uint page);
 
-private slots:
-    void search(QString, uint, ResultsTab*);
-    void download(std::shared_ptr<Product*>);
+signals:
+    void changePage(QString, uint);
+    void downloadProduct(std::shared_ptr<Product*>);
+    void openProduct(std::shared_ptr<Product*>);
 };
 
-#endif // WIDGET_H
+#endif // RESULTSTAB_H

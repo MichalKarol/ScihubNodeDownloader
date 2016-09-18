@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT       += core gui network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -13,6 +13,16 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp\
-        widget.cpp
+        widget.cpp \
+    searchtab.cpp \
+    resultstab.cpp \
+    producttab.cpp \
+    authdialog.cpp \
+    product.cpp
 
-HEADERS  += widget.h
+HEADERS  += widget.h \
+    searchtab.h \
+    resultstab.h \
+    producttab.h \
+    authdialog.h \
+    product.h

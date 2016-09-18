@@ -12,43 +12,20 @@
 
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#ifndef WIDGET_H
-#define WIDGET_H
+#ifndef PRODUCTTAB_H
+#define PRODUCTTAB_H
 
-#include "authdialog.h"
 #include "product.h"
-#include "searchtab.h"
-#include "resultstab.h"
-#include "producttab.h"
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QAuthenticator>
 #include <QtWidgets>
 
-class Widget : public QWidget
-{
+class ProductTab : public QWidget {
     Q_OBJECT
-
 public:
-    Widget(QWidget *parent = 0);
-    void setAuth(std::pair<QString, std::pair<QByteArray *, QByteArray *>> authData);
-    ~Widget();
+    explicit ProductTab(QWidget *parent = 0);
 
-private:
-    QString username;
-    std::pair<QByteArray*, QByteArray*> password;
+signals:
 
-    QTabWidget* mainTabWidget = nullptr;
-    SearchTab* searchTab = nullptr;
-
-    QNetworkAccessManager* networkAccess = nullptr;
-
-    QString getPassword();
-
-private slots:
-    void search(QString, uint, ResultsTab*);
-    void download(std::shared_ptr<Product*>);
+public slots:
 };
 
-#endif // WIDGET_H
+#endif // PRODUCTTAB_H

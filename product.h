@@ -12,15 +12,15 @@
 
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#include "widget.h"
-#include <QApplication>
+#ifndef PRODUCT_H
+#define PRODUCT_H
 
-int main(int argc, char *argv[])
-{
-    QApplication a(argc, argv);
+#include <QMap>
 
-    Widget w;
-    w.show();
+struct Product {
+    QMap<QString, std::pair<QString, QString>> attrybutes;
+    QByteArray quicklook;
+    QByteArray metadata;
+};
 
-    return a.exec();
-}
+#endif // PRODUCT_H
