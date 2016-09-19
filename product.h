@@ -16,11 +16,27 @@
 #define PRODUCT_H
 
 #include <QMap>
+#include <functional>
+#include <vector>
 
 struct Product {
-    QMap<QString, std::pair<QString, QString>> attrybutes;
+    struct Node {
+        QMap<QString, Node*> nodes;
+        QString name;
+        QString href;
+        ulong size = 0;
+        QString checksum;
+        bool directory = true;
+    };
+    ~Product() {
+        std::function<void (Node*)> clear = [&](Node* node) -> void { for (Node* n : node->nodes) { clear(n); } delete node; node = nullptr; };
+        clear(root);
+    }
+
+    QMap<QString, std::pair<QString, QString>> attributes;
     QByteArray quicklook;
-    QByteArray metadata;
+    QByteArray manifest;
+    Node* root = nullptr;
 };
 
 #endif // PRODUCT_H

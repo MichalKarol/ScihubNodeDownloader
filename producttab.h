@@ -17,15 +17,26 @@
 
 #include "product.h"
 #include <QtWidgets>
+#include <memory>
 
 class ProductTab : public QWidget {
     Q_OBJECT
 public:
-    explicit ProductTab(QWidget *parent = 0);
+    explicit ProductTab(std::shared_ptr<Product*> product, QWidget *parent = 0);
 
-signals:
+private:
+    std::shared_ptr<Product*> product;
+
+    QTextBrowser* manifest = nullptr;
+    QGraphicsView* quicklook = nullptr;
+    QTreeWidget* structure = nullptr;
 
 public slots:
+    void updateManifest();
+    void updateQuicklook();
+
+signals:
+    void downloadNode(Product::Node*);
 };
 
 #endif // PRODUCTTAB_H

@@ -25,9 +25,9 @@
 #include <QNetworkReply>
 #include <QAuthenticator>
 #include <QtWidgets>
+#include <queue>
 
-class Widget : public QWidget
-{
+class Widget : public QWidget {
     Q_OBJECT
 
 public:
@@ -43,12 +43,17 @@ private:
     SearchTab* searchTab = nullptr;
 
     QNetworkAccessManager* networkAccess = nullptr;
+    QSemaphore* requestsSem = new QSemaphore(2);
 
     QString getPassword();
+    void downloadUrl(QUrl url, QString md5, QString path);
+    void waitForRequest();
 
 private slots:
-    void search(QString, uint, ResultsTab*);
+    void search(QString, uint, std::shared_ptr<ResultsTab *>);
     void download(std::shared_ptr<Product*>);
+    void openProduct(std::shared_ptr<Product*>);
+    void downloadNode(Product::Node*);
 };
 
 #endif // WIDGET_H

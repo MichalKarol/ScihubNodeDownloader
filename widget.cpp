@@ -24,8 +24,7 @@ Widget::Widget(QWidget* parent) : QWidget(parent) {
     });
 
     searchTab = new SearchTab(mainTabWidget);
-    connect(searchTab, &SearchTab::searchQuery, [this](QString query) -> void { search(query, 0, nullptr); });
-    //connect(searchTab, &SearchTab::searchQuery, this, &Widget::search);
+    connect(searchTab, &SearchTab::searchQuery, [this](QString query) -> void { search(query, 0, std::make_shared<ResultsTab*>(nullptr)); });
 
     networkAccess = new QNetworkAccessManager(this);
     networkAccess->connectToHostEncrypted("https://scihub.copernicus.eu");
@@ -38,7 +37,6 @@ Widget::Widget(QWidget* parent) : QWidget(parent) {
         }
         delete dialog; dialog = nullptr;
     });
-
 
     mainTabWidget->addTab(searchTab, "Search");
     mainLayout->addWidget(mainTabWidget);
@@ -64,53 +62,31 @@ QString Widget::getPassword() {
 
     return tmp;
 }
-void Widget::search(QString query, uint page, ResultsTab* tab) {
-    qDebug() << "search";
-    qDebug() << QUrl("https://scihub.copernicus.eu/dhus/search?q=" + query + "&start=" + QString::number(page * 10));
-    QNetworkRequest request(QUrl("https://scihub.copernicus.eu/dhus/search?q=" + query + "&start=" + QString::number(page * 10)));
-    if (!username.isEmpty()) { request.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64()); }
-
-    QNetworkReply* reply = networkAccess->get(request);
-    connect(reply, &QNetworkReply::finished, [=]() mutable -> void {
-        if (tab == nullptr) {
-            tab = new ResultsTab(query, this);
-            connect(tab, &ResultsTab::changePage, [=](QString query, uint page) -> void {
-                qDebug() << "searchAA";
-                search(query, page, tab);
-            });
-            connect(tab, &ResultsTab::downloadProduct, this, &Widget::download);
-
-            int newTabIndex = mainTabWidget->addTab(tab, "Reply");
-            mainTabWidget->setCurrentIndex(newTabIndex);
-        }
-
-        tab->updateResults(reply->readAll(), page);
+void Widget::waitForRequest() {
+    QEventLoop loop;
+    QThread* thread = new QThread(this);
+    connect(thread, &QThread::started, [=]() mutable -> void {
+        requestsSem->acquire();
+        thread->exit();
     });
+    connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
+    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
+    thread->start();
+    loop.exec();
 }
-void Widget::download(std::shared_ptr<Product*> product) {
-    QString filename = QFileDialog::getSaveFileName(this, "Save file",
-                                                    QDir::homePath() + "/" + (*product)->attrybutes["title"].second + ".zip", "Zip (*.zip)");
 
-    if (filename.isEmpty()) { return; }
-
-    std::shared_ptr<QByteArray> desiredMD5 = std::make_shared<QByteArray>("");
+void Widget::downloadUrl(QUrl url, QString md5, QString path) {
     std::shared_ptr<QCryptographicHash> md5sum = std::make_shared<QCryptographicHash>(QCryptographicHash::Md5);
+    std::shared_ptr<QFile> file = std::make_shared<QFile>(path);
 
-    std::shared_ptr<QFile> file = std::make_shared<QFile>(filename);
     if (!(*file).open(QFile::ReadWrite)) {
         QMessageBox::critical(this, "Opening file", "Cannot open file.");
         return;
     }
 
-    QNetworkRequest md5request(QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attrybutes["id"].second + "')/Checksum/Value/$value"));
-    if (!username.isEmpty()) { md5request.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64()); }
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64());
 
-    QNetworkReply* md5Reply = networkAccess->get(md5request);
-    connect(md5Reply, &QNetworkReply::finished, [=]() -> void {
-        (*desiredMD5) = md5Reply->readAll();
-    });
-
-    QNetworkRequest request(QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attrybutes["id"].second + "')/$value"));
     if ((*file).size() != 0 &&
             QMessageBox::question(this, "Resume", "Would you like to resume download?\nResuming could be time consuming due to checksum calculation.") == QMessageBox::Yes) {
         request.setRawHeader("Range","bytes=" + QByteArray::number((*file).size()) + "-");
@@ -143,11 +119,11 @@ void Widget::download(std::shared_ptr<Product*> product) {
         (*file).close();
         (*file).open(QFile::ReadWrite | QFile::Append);
     }
-    if (!username.isEmpty()) { request.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64()); }
+
+    waitForRequest();
 
     QNetworkReply* reply = networkAccess->get(request);
     QProgressDialog* progress = new QProgressDialog("", "Cancel", 0, 100, this);
-    progress->setWindowTitle((*product)->attrybutes["title"].second);
     progress->show();
 
     connect(progress, &QProgressDialog::canceled, reply, &QNetworkReply::abort);
@@ -165,20 +141,161 @@ void Widget::download(std::shared_ptr<Product*> product) {
         }
     });
     connect(reply, &QNetworkReply::finished, [=]() mutable -> void {
+        requestsSem->release();
         QByteArray data = reply->readAll();
-        (*md5sum).addData(data);
-        (*file).write(data);
 
-        (*file).close();
-        progress->close();
-        delete progress; progress = nullptr;
-        qDebug() << (*md5sum).result().toHex().toUpper() << (*desiredMD5);
+        if (reply->error() == QNetworkReply::NoError) {
+            (*md5sum).addData(data);
+            (*file).write(data);
 
-        if ((*md5sum).result().toHex().toUpper() == (*desiredMD5)) {
-            QMessageBox::information(this, "MD5 checksum", "MD5 checksum is correct.");
+            (*file).close();
+            progress->close();
+            delete progress; progress = nullptr;
+
+            if ((*md5sum).result().toHex().toUpper() != md5.toUpper()) {
+                QMessageBox::critical(this, "MD5 checksum", "MD5 checksum is incorrect.\nFile could be damaged.");
+                if (QMessageBox::question(this, "MD5 checksum", "Download again corrupted file?") == QMessageBox::Yes) {
+                    downloadUrl(url, md5, path);
+                }
+            }
         } else {
-            QMessageBox::critical(this, "MD5 checksum", "MD5 checksum is incorrect.\nFile could be damaged.");
+
+            if (reply->hasRawHeader("cause-message") && reply->rawHeader("cause-message").contains("null")) { return; }
+
+            QMessageBox::warning(this, "Conenction error", reply->errorString());
+            if (QMessageBox::question(this, "Conenction error", "Download corrupted file again?") == QMessageBox::Yes) {
+                downloadUrl(url, md5, path);
+            }
+        }
+
+    });
+}
+
+void Widget::search(QString query, uint page, std::shared_ptr<ResultsTab*> tab) {
+    QNetworkRequest request(QUrl("https://scihub.copernicus.eu/dhus/search?q=" + query + "&start=" + QString::number(page * 10)));
+    if (!username.isEmpty()) { request.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64()); }
+
+    QNetworkReply* reply = networkAccess->get(request);
+    connect(reply, &QNetworkReply::finished, [=]() mutable -> void {
+        if (reply->error() == QNetworkReply::NoError) {
+            if ((*tab) == nullptr) {
+                tab = std::make_shared<ResultsTab*>(new ResultsTab(query, this));
+                connect((*tab), &ResultsTab::changePage, [=](QString query, uint page) -> void {
+                    search(query, page, tab);
+                });
+                connect((*tab), &ResultsTab::downloadProduct, this, &Widget::download);
+                connect((*tab), &ResultsTab::openProduct, this, &Widget::openProduct);
+
+                int newTabIndex = mainTabWidget->addTab((*tab), "Reply");
+                mainTabWidget->setCurrentIndex(newTabIndex);
+            }
+
+            (*tab)->updateResults(reply->readAll(), page);
+        } else {
+            QMessageBox::warning(this, "Conenction error", reply->errorString());
         }
     });
-
 }
+void Widget::download(std::shared_ptr<Product*> product) {
+    QString filename = QFileDialog::getSaveFileName(this, "Save file",
+                                                    QDir::homePath() + "/" + (*product)->attributes["title"].second + ".zip", "Zip (*.zip)");
+
+    if (filename.isEmpty()) { return; }
+    QUrl url = QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attributes["id"].second + "')/$value");
+
+    QNetworkRequest md5request(QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attributes["id"].second + "')/Checksum/Value/$value"));
+    md5request.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64());
+
+    waitForRequest();
+
+    QNetworkReply* md5Reply = networkAccess->get(md5request);
+    connect(md5Reply, &QNetworkReply::finished, [=]() -> void {
+        requestsSem->release();
+        if (md5Reply->error() == QNetworkReply::NoError) {
+            downloadUrl(url, QString(md5Reply->readAll()), filename);
+        } else {
+            QMessageBox::warning(this, "Conenction error", md5Reply->errorString());
+        }
+    });
+}
+void Widget::openProduct(std::shared_ptr<Product*> product) {
+
+    std::shared_ptr<ProductTab*> tab = std::make_shared<ProductTab*>(new ProductTab(product, this));
+    connect((*tab), &ProductTab::downloadNode, this, &Widget::downloadNode);
+
+    QString platformSpecific;
+    if ((*product)->attributes["platformname"].second == "Sentinel-1") {
+        platformSpecific = "Nodes('preview')/Nodes('quick-look.png')";
+    } else  if ((*product)->attributes["platformname"].second == "Sentinel-2") {
+        platformSpecific = "Nodes('" + (*product)->attributes["title"].second.replace("PRD", "BWI") + ".png')";
+    } else {
+        return; // Sentinel-3 has no internal structure avaliable
+    }
+
+    if ((*product)->quicklook.isEmpty()) {
+        waitForRequest();
+
+            QNetworkRequest quicklookRequest(QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attributes["id"].second
+                                             + "')/Nodes('" + (*product)->attributes["filename"].second + "')/" + platformSpecific + "/$value"));
+            quicklookRequest.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64());
+
+            QNetworkReply* quicklookReply = networkAccess->get(quicklookRequest);
+            connect(quicklookReply, &QNetworkReply::finished, [=]() -> void {
+                requestsSem->release();
+                if (quicklookReply->error() == QNetworkReply::NoError) {
+                    (*product)->quicklook = quicklookReply->readAll();
+                    (*tab)->updateQuicklook();
+                } else {
+                    QMessageBox::warning(this, "Conenction error", quicklookReply->errorString());
+                }
+            });
+    } else {
+        (*tab)->updateQuicklook();
+    }
+
+    if ((*product)->manifest.isEmpty()) {
+        waitForRequest();
+
+            QNetworkRequest manifestRequest(QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attributes["id"].second
+                                            + "')/Nodes('" + (*product)->attributes["filename"].second + "')/Nodes('manifest.safe')/$value"));
+            manifestRequest.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64());
+
+            QNetworkReply* manifestReply = networkAccess->get(manifestRequest);
+            connect(manifestReply, &QNetworkReply::finished, [=]() -> void {
+                requestsSem->release();
+                if (manifestReply->error() == QNetworkReply::NoError) {
+                    (*product)->manifest = manifestReply->readAll();
+                    (*tab)->updateManifest();
+                } else {
+                    QMessageBox::warning(this, "Conenction error", manifestReply->errorString());
+                }
+            });
+    } else {
+        (*tab)->updateManifest();
+    }
+
+    int newTabIndex = mainTabWidget->addTab((*tab), (*product)->attributes["title"].second);
+    mainTabWidget->setCurrentIndex(newTabIndex);
+}
+void Widget::downloadNode(Product::Node* node) {
+    QString filename = QFileDialog::getExistingDirectory(this, "Save", QDir::homePath());
+    if (filename.isEmpty()) { return; }
+
+    std::function<void (Product::Node*, QString)> build = [&](Product::Node* node, QString path) -> void {
+        if (node->directory) {
+            QDir currentDir(path);
+            currentDir.mkdir(node->name);
+            path += ("/" + node->name);
+
+            for (Product::Node* n : node->nodes.values()) {
+                build(n, path);
+            }
+        } else {
+            path += ("/" + node->name);
+            downloadUrl(QUrl(node->href + "/$value"), node->checksum, path);
+        }
+    };
+
+    build(node, filename);
+}
+

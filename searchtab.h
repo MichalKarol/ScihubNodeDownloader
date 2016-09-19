@@ -37,6 +37,9 @@ private:
     QDateEdit* ingestionFrom = nullptr;
     QDateEdit* ingestionTo = nullptr;
 
+    QLineEdit* latitude[3];
+    QLineEdit* longitude[3];
+
     QSpinBox* relativeOrbitNumber = nullptr;
     QComboBox* orbitDirection = nullptr;
 

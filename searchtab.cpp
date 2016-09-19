@@ -86,6 +86,28 @@ SearchTab::SearchTab(QWidget *parent) : QWidget(parent) {
     ingestionLayout->addWidget(ingestionFrom);
     ingestionLayout->addWidget(ingestionTo);
 
+    QGridLayout* geoLayout = new QGridLayout();
+    QIntValidator* bigValidator = new QIntValidator(-180, 180, this);
+    QIntValidator* smallValidator = new QIntValidator(0, 60, this);
+
+    for (uint  i = 0; i < 3; i++) {
+        latitude[i] = new QLineEdit(this);
+        latitude[i]->setFixedWidth(ingestionFrom->width());
+        geoLayout->addWidget(latitude[i], 0, i);
+    }
+    latitude[0]->setValidator(bigValidator);
+    latitude[1]->setValidator(smallValidator);
+    latitude[2]->setValidator(smallValidator);
+
+    for (uint  i = 0; i < 3; i++) {
+        longitude[i] = new QLineEdit(this);
+        longitude[i]->setFixedWidth(ingestionFrom->width());
+        geoLayout->addWidget(longitude[i], 1, i);
+    }
+    longitude[0]->setValidator(bigValidator);
+    longitude[1]->setValidator(smallValidator);
+    longitude[2]->setValidator(smallValidator);
+
     relativeOrbitNumber = new QSpinBox(this);
     relativeOrbitNumber->setRange(0, 1000);
 
@@ -101,6 +123,7 @@ SearchTab::SearchTab(QWidget *parent) : QWidget(parent) {
     topLayout->addRow("Query", query);
     topLayout->addRow("Sensing period", checkBoxToLayout(sensingLayout));
     topLayout->addRow("Ingestion period", checkBoxToLayout(ingestionLayout));
+    topLayout->addRow("Geographical point", checkBoxToLayout(geoLayout));
     topLayout->addRow("Relative orbit number", checkBoxToWidget(relativeOrbitNumber));
     topLayout->addRow("Orbit direction", checkBoxToWidget(orbitDirection));
     topLayout->addRow("Collection", checkBoxToWidget(collection));
@@ -189,6 +212,9 @@ void SearchTab::generateQuery() {
                                                                          QDateTime(sensingTo->date(), QTime(23,59,59)).toString(Qt::ISODate) + ".999Z"), sensingTo),
                                   ifEnabled(bracketsRange("ingestionDate", QDateTime(ingestionFrom->date(), QTime(0,0,0)).toString(Qt::ISODate),
                                                                            QDateTime(ingestionTo->date(), QTime(23,59,59)).toString(Qt::ISODate)), ingestionFrom),
+                                  ifEnabled(brackets("footprint", "\"Intersects(" + QString::number((latitude[0]->text().toInt() < 0 ? -1 : 1) * (fabs(latitude[0]->text().toDouble()) + latitude[1]->text().toDouble()/60 + latitude[2]->text().toDouble()/3600))
+                                                                           + ", " + QString::number((longitude[0]->text().toInt() < 0 ? -1 : 1) * (fabs(longitude[0]->text().toDouble()) + longitude[1]->text().toDouble()/60 + longitude[2]->text().toDouble()/3600))
+                                                                           + ")\""), latitude[0]),
                                   ifEnabled(brackets("relativeorbitnumber", QString::number(relativeOrbitNumber->value())), relativeOrbitNumber),
                                   ifEnabled(brackets("orbitdirection", orbitDirection->currentText()), orbitDirection),
                                   ifEnabled(brackets("collection", collection->currentText()), collection),

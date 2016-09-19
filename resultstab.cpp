@@ -20,17 +20,18 @@ ResultsTab::ResultsTab(QString query, QWidget* parent) : QWidget(parent), query(
     view->setColumnCount(2);
     view->header()->hide();
     view->setRootIsDecorated(false);
+    connect(view, &QTreeWidget::doubleClicked, [=](QModelIndex index) -> void {
+       emit openProduct(products[index.row()]);
+    });
 
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     previousPage = new QPushButton("<", this);
     connect(previousPage, &QPushButton::clicked, [=]() mutable -> void {
-        qDebug() << page;
-        if (page >= 1) { qDebug() << "P"; emit changePage(query, --page); }
+        if (page >= 1) { emit changePage(query, --page); }
     });
     nextPage = new QPushButton(">", this);
     connect(nextPage, &QPushButton::clicked, [=]() mutable -> void {
-        qDebug() << page << results;
-        if (page + 1 < (results/10 + (results%10 == 0 ? 0 : 1))) { qDebug() << "N"; emit changePage(query, ++page); }
+        if (page + 1 < (results/10 + (results%10 == 0 ? 0 : 1))) { emit changePage(query, ++page); }
     });
     buttonLayout->addWidget(previousPage);
     buttonLayout->addWidget(nextPage);
@@ -59,15 +60,13 @@ void ResultsTab::updateResults(QByteArray res, uint page) {
                 product = std::make_shared<Product*>(new Product());
             } else if (reader.name() == "totalResults") {
                 results = reader.readElementText().toUInt();
-
-                qDebug() << results;
             }
 
             if (product != nullptr) {
                 if (reader.name() == "title"
                         || reader.name() == "id"
                         || reader.name() == "summary") {
-                    (*product)->attrybutes.insert(reader.name().toString(), {"str", reader.readElementText()});
+                    (*product)->attributes.insert(reader.name().toString(), {"str", reader.readElementText()});
                 } else if (reader.name() == "str"
                            || reader.name() == "int"
                            || reader.name() == "long"
@@ -80,8 +79,7 @@ void ResultsTab::updateResults(QByteArray res, uint page) {
 
                         if (attr.name().toString() == "name") {
                             QString value = attr.value().toString();
-                            //qDebug() << value << reader.readElementText();
-                            (*product)->attrybutes.insert(value, {reader.name().toString(), reader.readElementText()});
+                            (*product)->attributes.insert(value, {reader.name().toString(), reader.readElementText()});
                             break;
                         }
                     }
@@ -95,10 +93,10 @@ void ResultsTab::updateResults(QByteArray res, uint page) {
 
     for (uint  i = 0; i < products.size(); i++) {
         QTreeWidgetItem* item = new QTreeWidgetItem(view);
-        item->setText(0, (*products[i])->attrybutes["title"].second);
+        item->setText(0, (*products[i])->attributes["title"].second);
 
         QPushButton* saveProduct = new QPushButton(style()->standardIcon(QStyle::SP_DialogSaveButton), "", this);
-        saveProduct->setToolTip((*products[i])->attrybutes["size"].second);
+        saveProduct->setToolTip((*products[i])->attributes["size"].second);
         connect(saveProduct, &QPushButton::clicked, [this, i]() -> void {
             emit downloadProduct(products[i]);
         });
@@ -109,8 +107,4 @@ void ResultsTab::updateResults(QByteArray res, uint page) {
 
     view->resizeColumnToContents(1);
     view->resizeColumnToContents(0);
-
-
-
-
 }

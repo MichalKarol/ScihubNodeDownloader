@@ -17,8 +17,7 @@ SOURCES += main.cpp\
     searchtab.cpp \
     resultstab.cpp \
     producttab.cpp \
-    authdialog.cpp \
-    product.cpp
+    authdialog.cpp
 
 HEADERS  += widget.h \
     searchtab.h \
