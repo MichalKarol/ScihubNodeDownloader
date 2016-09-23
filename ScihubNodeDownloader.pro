@@ -25,3 +25,7 @@ HEADERS  += widget.h \
     producttab.h \
     authdialog.h \
     product.h
+
+DISTFILES += \
+    README.md \
+    LICENSE
