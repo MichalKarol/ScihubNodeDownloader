@@ -31,14 +31,14 @@ private:
 
     QLineEdit* query = nullptr;
 
-    QDateEdit* sensingFrom = nullptr;
-    QDateEdit* sensingTo = nullptr;
+    QDateTimeEdit* sensingFrom = nullptr;
+    QDateTimeEdit* sensingTo = nullptr;
 
-    QDateEdit* ingestionFrom = nullptr;
-    QDateEdit* ingestionTo = nullptr;
+    QDateTimeEdit* ingestionFrom = nullptr;
+    QDateTimeEdit* ingestionTo = nullptr;
 
-    QLineEdit* latitude[3];
-    QLineEdit* longitude[3];
+    QLineEdit* latitude;
+    QLineEdit* longitude;
 
     QSpinBox* relativeOrbitNumber = nullptr;
     QComboBox* orbitDirection = nullptr;

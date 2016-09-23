@@ -55,58 +55,51 @@ SearchTab::SearchTab(QWidget *parent) : QWidget(parent) {
     query = new QLineEdit(this);
 
     QHBoxLayout* sensingLayout = new QHBoxLayout();
-    sensingFrom = new QDateEdit(QDate::currentDate(), this);
+    sensingFrom = new QDateTimeEdit(QDateTime(QDate::currentDate(), QTime(0,0,0)), this);
     sensingFrom->setDateRange(QDate(2014, 4, 3), QDate::currentDate());
     sensingFrom->setCalendarPopup(true);
-    connect(sensingFrom, &QDateEdit::dateChanged, [this](QDate date) -> void {
+    connect(sensingFrom, &QDateTimeEdit::dateChanged, [this](QDate date) -> void {
         sensingFrom->setDate((date <= sensingTo->date() ? date : sensingTo->date()));
     });
-    sensingTo = new QDateEdit(QDate::currentDate(), this);
+    sensingTo = new QDateTimeEdit(QDateTime(QDate::currentDate(), QTime(23,59,59)), this);
     sensingTo->setDateRange(QDate(2014, 4, 3), QDate::currentDate());
     sensingTo->setCalendarPopup(true);
-    connect(sensingTo, &QDateEdit::dateChanged, [this](QDate date) -> void {
+    connect(sensingTo, &QDateTimeEdit::dateChanged, [this](QDate date) -> void {
         sensingTo->setDate((date >= sensingFrom->date() ? date : sensingFrom->date()));
     });
     sensingLayout->addWidget(sensingFrom);
     sensingLayout->addWidget(sensingTo);
 
     QHBoxLayout* ingestionLayout = new QHBoxLayout();
-    ingestionFrom = new QDateEdit(QDate::currentDate(), this);
+    ingestionFrom = new QDateTimeEdit(QDateTime(QDate::currentDate(), QTime(0,0,0)), this);
     ingestionFrom->setDateRange(QDate(2014, 4, 3), QDate::currentDate());
     ingestionFrom->setCalendarPopup(true);
-    connect(ingestionFrom, &QDateEdit::dateChanged, [this](QDate date) -> void {
+    connect(ingestionFrom, &QDateTimeEdit::dateChanged, [this](QDate date) -> void {
         ingestionFrom->setDate((date <= ingestionTo->date() ? date : ingestionTo->date()));
     });
-    ingestionTo = new QDateEdit(QDate::currentDate(), this);
+    ingestionTo = new QDateTimeEdit(QDateTime(QDate::currentDate(), QTime(23,59,59)), this);
     ingestionTo->setDateRange(QDate(2014, 4, 3), QDate::currentDate());
     ingestionTo->setCalendarPopup(true);
-    connect(ingestionTo, &QDateEdit::dateChanged, [this](QDate date) -> void {
+    connect(ingestionTo, &QDateTimeEdit::dateChanged, [this](QDate date) -> void {
         ingestionTo->setDate((date >= ingestionFrom->date() ? date : ingestionFrom->date()));
     });
     ingestionLayout->addWidget(ingestionFrom);
     ingestionLayout->addWidget(ingestionTo);
 
-    QGridLayout* geoLayout = new QGridLayout();
-    QIntValidator* bigValidator = new QIntValidator(-180, 180, this);
-    QIntValidator* smallValidator = new QIntValidator(0, 60, this);
+    QVBoxLayout* geoLayout = new QVBoxLayout();
 
-    for (uint  i = 0; i < 3; i++) {
-        latitude[i] = new QLineEdit(this);
-        latitude[i]->setFixedWidth(ingestionFrom->width());
-        geoLayout->addWidget(latitude[i], 0, i);
-    }
-    latitude[0]->setValidator(bigValidator);
-    latitude[1]->setValidator(smallValidator);
-    latitude[2]->setValidator(smallValidator);
+    latitude = new QLineEdit();
+    latitude->setInputMask("#99° 99' 99''");
+    latitude->setValidator(new QRegExpValidator(QRegExp("^(\\+|-)?(?:90(..00..00)|(?:0[0-9]|[0-8][0-9])(..[0-5][0-9]..[0-5][0-9])).."), this));
+    latitude->setText("+00000000");
 
-    for (uint  i = 0; i < 3; i++) {
-        longitude[i] = new QLineEdit(this);
-        longitude[i]->setFixedWidth(ingestionFrom->width());
-        geoLayout->addWidget(longitude[i], 1, i);
-    }
-    longitude[0]->setValidator(bigValidator);
-    longitude[1]->setValidator(smallValidator);
-    longitude[2]->setValidator(smallValidator);
+    longitude = new QLineEdit();
+    longitude->setInputMask("#999° 99' 99''");
+    longitude->setValidator(new QRegExpValidator(QRegExp("^(\\+|-)?(?:180(..00..00)|(?:00[0-9]|0[0-9][0-9]|1[0-7][0-9])(..[0-5][0-9]..[0-5][0-9])).."), this));
+    longitude->setText("+00000000");
+
+    geoLayout->addWidget(latitude);
+    geoLayout->addWidget(longitude);
 
     relativeOrbitNumber = new QSpinBox(this);
     relativeOrbitNumber->setRange(0, 1000);
@@ -206,15 +199,15 @@ void SearchTab::generateQuery() {
 
     QString generated = merge({
                                   query->text(),
-                                  ifEnabled(bracketsRange("beginPosition", QDateTime(sensingFrom->date(), QTime(0,0,0)).toString(Qt::ISODate) + ".000Z",
-                                                                           QDateTime(sensingTo->date(), QTime(23,59,59)).toString(Qt::ISODate) + ".999Z"), sensingFrom),
-                                  ifEnabled(bracketsRange("endPosition", QDateTime(sensingFrom->date(), QTime(0,0,0)).toString(Qt::ISODate) + ".000Z",
-                                                                         QDateTime(sensingTo->date(), QTime(23,59,59)).toString(Qt::ISODate) + ".999Z"), sensingTo),
-                                  ifEnabled(bracketsRange("ingestionDate", QDateTime(ingestionFrom->date(), QTime(0,0,0)).toString(Qt::ISODate),
-                                                                           QDateTime(ingestionTo->date(), QTime(23,59,59)).toString(Qt::ISODate)), ingestionFrom),
-                                  ifEnabled(brackets("footprint", "\"Intersects(" + QString::number((latitude[0]->text().toInt() < 0 ? -1 : 1) * (fabs(latitude[0]->text().toDouble()) + latitude[1]->text().toDouble()/60 + latitude[2]->text().toDouble()/3600))
-                                                                           + ", " + QString::number((longitude[0]->text().toInt() < 0 ? -1 : 1) * (fabs(longitude[0]->text().toDouble()) + longitude[1]->text().toDouble()/60 + longitude[2]->text().toDouble()/3600))
-                                                                           + ")\""), latitude[0]),
+                                  ifEnabled(bracketsRange("beginPosition", QDateTime(sensingFrom->dateTime()).toString(Qt::ISODate) + ".000Z",
+                                                           QDateTime(sensingTo->dateTime()).toString(Qt::ISODate) + ".999Z"), sensingFrom),
+                                  ifEnabled(bracketsRange("endPosition", QDateTime(sensingFrom->dateTime()).toString(Qt::ISODate) + ".000Z",
+                                                           QDateTime(sensingTo->dateTime()).toString(Qt::ISODate) + ".999Z"), sensingTo),
+                                  ifEnabled(bracketsRange("ingestionDate", QDateTime(ingestionFrom->dateTime()).toString(Qt::ISODate) + ".000Z",
+                                                           QDateTime(ingestionTo->dateTime()).toString(Qt::ISODate) + ".999Z"), ingestionFrom),
+                                  ifEnabled(brackets("footprint", "\"Intersects(" + QString::number((latitude->text().startsWith("-") ? -1 : 1) * (latitude->text().mid(1, 2).toDouble() + latitude->text().mid(5, 2).toDouble()/60 + latitude->text().mid(9, 2).toDouble()/3600))
+                                                    + ", " + QString::number((longitude->text().startsWith("-") ? -1 : 1) * (longitude->text().mid(1, 3).toDouble() + longitude->text().mid(6, 2).toDouble()/60 + longitude->text().mid(10, 2).toDouble()/3600))
+                                                    + ")\""), latitude),
                                   ifEnabled(brackets("relativeorbitnumber", QString::number(relativeOrbitNumber->value())), relativeOrbitNumber),
                                   ifEnabled(brackets("orbitdirection", orbitDirection->currentText()), orbitDirection),
                                   ifEnabled(brackets("collection", collection->currentText()), collection),
@@ -236,7 +229,7 @@ void SearchTab::generateQuery() {
             generated = merge({
                                   generated,
                                   ifEnabled(bracketsRange("cloudcoverpercentage", QString::number(cloudCoverFrom->value()),
-                                                                                   QString::number(cloudCoverTo->value())), cloudCoverFrom),
+                                  QString::number(cloudCoverTo->value())), cloudCoverFrom),
                               });
         } break;
         case 2: {
@@ -245,6 +238,4 @@ void SearchTab::generateQuery() {
     }
 
     emit searchQuery(generated);
-
-    qDebug() << generated;
 }

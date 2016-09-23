@@ -33,10 +33,11 @@ private:
 
 ProductTab::ProductTab(std::shared_ptr<Product*> product, QWidget *parent) : QWidget(parent), product(product) {
     manifest = new QTextBrowser(this);
+    manifest->setLineWrapMode(QTextBrowser::NoWrap);
     QString metadata;
 
     for (auto i = (*product)->attributes.begin(); i != (*product)->attributes.end(); i++) {
-        metadata.append((*i).first + " " + i.key() + ": " + (*i).second + "\n");
+        metadata.append(i.key() + ":\t" + (*i).second + "\n");
     }
     manifest->setText(metadata);
 
@@ -44,8 +45,14 @@ ProductTab::ProductTab(std::shared_ptr<Product*> product, QWidget *parent) : QWi
     quicklook->setDragMode(QGraphicsView::ScrollHandDrag);
 
     structure = new QTreeWidget(this);
-    structure->header()->hide();
     structure->setColumnCount(2);
+    structure->header()->setStretchLastSection(false);
+    structure->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    //structure->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    structure->header()->hide();
+
+
+
 
     QGridLayout* mainLayout = new QGridLayout(this);
     mainLayout->addWidget(manifest, 0, 0);
@@ -116,22 +123,21 @@ void ProductTab::updateManifest() {
         }
     }
 
-    auto setItem = [this](Product::Node* node, QTreeWidgetItem* item) -> void {
+    auto setItem = [=](Product::Node* node, QTreeWidgetItem* item) -> void {
         item->setText(0, node->name);
         QPushButton* saveButton = new QPushButton(style()->standardIcon(QStyle::SP_DialogSaveButton), "", this);
         connect(saveButton, &QPushButton::clicked, [this, node]() -> void { emit downloadNode(node); });
         structure->setItemWidget(item, 1, saveButton);
     };
-    std::function<QTreeWidgetItem* (Product::Node*, QTreeWidgetItem*)> build = [&setItem, &build](Product::Node* node, QTreeWidgetItem* parent) -> QTreeWidgetItem* {
+    std::function<QTreeWidgetItem* (Product::Node*, QTreeWidgetItem*)> build = [&](Product::Node* node, QTreeWidgetItem* parent) -> QTreeWidgetItem* {
         QTreeWidgetItem* item = new QTreeWidgetItem(parent);
-        setItem(node, item);
-        for (Product::Node* n : node->nodes.values()) { build(n, item); }
+        for (Product::Node* n : node->nodes.values()) {  setItem(n, build(n, item)); }
         return item;
     };
 
     structure->addTopLevelItem(build(root, nullptr));
+    setItem(root, structure->topLevelItem(0));
     structure->resizeColumnToContents(1);
-    structure->resizeColumnToContents(0);
 }
 
 void ProductTab::updateQuicklook() {

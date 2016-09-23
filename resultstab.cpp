@@ -17,12 +17,12 @@
 ResultsTab::ResultsTab(QString query, QWidget* parent) : QWidget(parent), query(query) {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     view = new QTreeWidget(this);
-    view->setColumnCount(2);
+    view->setColumnCount(3);
+    view->header()->setStretchLastSection(false);
+    view->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     view->header()->hide();
     view->setRootIsDecorated(false);
-    connect(view, &QTreeWidget::doubleClicked, [=](QModelIndex index) -> void {
-       emit openProduct(products[index.row()]);
-    });
+    connect(view, &QTreeWidget::doubleClicked, [=](QModelIndex index) -> void { emit openProduct(products[index.row()]); });
 
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     previousPage = new QPushButton("<", this);
@@ -95,16 +95,23 @@ void ResultsTab::updateResults(QByteArray res, uint page) {
         QTreeWidgetItem* item = new QTreeWidgetItem(view);
         item->setText(0, (*products[i])->attributes["title"].second);
 
-        QPushButton* saveProduct = new QPushButton(style()->standardIcon(QStyle::SP_DialogSaveButton), "", this);
-        saveProduct->setToolTip((*products[i])->attributes["size"].second);
-        connect(saveProduct, &QPushButton::clicked, [this, i]() -> void {
+        QPushButton* openProductButton = new QPushButton(style()->standardIcon(QStyle::SP_DialogOpenButton), "", this);
+        openProductButton->setToolTip("Open product");
+        connect(openProductButton, &QPushButton::clicked, [this, i]() -> void {
+            emit openProduct(products[i]);
+        });
+
+        QPushButton* saveProductButton = new QPushButton(style()->standardIcon(QStyle::SP_DialogSaveButton), "", this);
+        saveProductButton->setToolTip((*products[i])->attributes["size"].second);
+        connect(saveProductButton, &QPushButton::clicked, [this, i]() -> void {
             emit downloadProduct(products[i]);
         });
 
-        view->setItemWidget(item, 1, saveProduct);
+        view->setItemWidget(item, 1, openProductButton);
+        view->setItemWidget(item, 2, saveProductButton);
         view->addTopLevelItem(item);
     }
 
+    view->resizeColumnToContents(2);
     view->resizeColumnToContents(1);
-    view->resizeColumnToContents(0);
 }

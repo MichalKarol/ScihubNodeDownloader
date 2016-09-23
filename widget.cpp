@@ -38,9 +38,30 @@ Widget::Widget(QWidget* parent) : QWidget(parent) {
         delete dialog; dialog = nullptr;
     });
 
+    sciHubStatus = new QLabel("Checking SciHub availability.", this);
+
+    QTimer* availabilityTimer = new QTimer(this);
+    availabilityTimer->setInterval(1000);
+    connect(availabilityTimer, &QTimer::timeout, [=]() {
+            QNetworkReply* reply = networkAccess->get(QNetworkRequest(QUrl("https://scihub.copernicus.eu/dhus")));
+            connect(reply, &QNetworkReply::finished, [=]() {
+                if (reply->error() == QNetworkReply::NoError) {
+                    availabilityTimer->setInterval(5000);
+                    availabilityTimer->start();
+                    sciHubStatus->setText("<font color='green'>SciHub is online</font>");
+                } else {
+                    availabilityTimer->setInterval(1000);
+                    availabilityTimer->start();
+                    sciHubStatus->setText("<font color='red'>SciHub is offline</font>");
+                }
+            });
+
+    });
+    availabilityTimer->start(900);
+
     mainTabWidget->addTab(searchTab, "Search");
     mainLayout->addWidget(mainTabWidget);
-
+    mainLayout->addWidget(sciHubStatus);
 }
 
 Widget::~Widget() {

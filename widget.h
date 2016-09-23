@@ -41,6 +41,7 @@ private:
 
     QTabWidget* mainTabWidget = nullptr;
     SearchTab* searchTab = nullptr;
+    QLabel* sciHubStatus = nullptr;
 
     QNetworkAccessManager* networkAccess = nullptr;
     QSemaphore* requestsSem = new QSemaphore(2);
