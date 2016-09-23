@@ -19,6 +19,7 @@ SearchTab::SearchTab(QWidget *parent) : QWidget(parent) {
 
     // Helpful functions
     auto checkBoxToWidget = [](QWidget* widget) -> QLayout* {
+        widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         widget->setEnabled(false);
         QCheckBox* checkBox = new QCheckBox(widget);
         connect(checkBox, &QCheckBox::toggled, [widget](bool state) -> void {
@@ -33,7 +34,10 @@ SearchTab::SearchTab(QWidget *parent) : QWidget(parent) {
     auto checkBoxToLayout = [this](QLayout* layout) -> QLayout* {
         for (int i = 0; i < layout->count(); i++) {
             QWidget* widget = layout->itemAt(i)->widget();
-            if (widget != nullptr) { widget->setEnabled(false); }
+            if (widget != nullptr) {
+                widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+                widget->setEnabled(false);
+            }
         }
         QCheckBox* checkBox = new QCheckBox(this);
         connect(checkBox, &QCheckBox::toggled, [layout](bool state) -> void {
@@ -53,6 +57,7 @@ SearchTab::SearchTab(QWidget *parent) : QWidget(parent) {
     topLayout = new QFormLayout();
 
     query = new QLineEdit(this);
+    query->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
 
     QHBoxLayout* sensingLayout = new QHBoxLayout();
     sensingFrom = new QDateTimeEdit(QDateTime(QDate::currentDate(), QTime(0,0,0)), this);
