@@ -145,7 +145,7 @@ SearchTab::SearchTab(QWidget *parent) : QWidget(parent) {
     sensorMode = new QComboBox(sentinel1);
     sensorMode->addItems({"SM", "IW", "EW", "WV"});
 
-    sentinel1Layout->addRow("Sattelite", checkBoxToWidget(sattelite));
+    sentinel1Layout->addRow("Satellite", checkBoxToWidget(sattelite));
     sentinel1Layout->addRow("Product type", checkBoxToWidget(productType));
     sentinel1Layout->addRow("Polarisation mode", checkBoxToWidget(polarisationMode));
     sentinel1Layout->addRow("Sensor mode", checkBoxToWidget(sensorMode));

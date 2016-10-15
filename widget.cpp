@@ -244,20 +244,10 @@ void Widget::openProduct(std::shared_ptr<Product*> product) {
     std::shared_ptr<ProductTab*> tab = std::make_shared<ProductTab*>(new ProductTab(product, this));
     connect((*tab), &ProductTab::downloadNode, this, &Widget::downloadNode);
 
-    QString platformSpecific;
-    if ((*product)->attributes["platformname"].second == "Sentinel-1") {
-        platformSpecific = "Nodes('preview')/Nodes('quick-look.png')";
-    } else  if ((*product)->attributes["platformname"].second == "Sentinel-2") {
-        platformSpecific = "Nodes('" + (*product)->attributes["title"].second.replace("PRD", "BWI") + ".png')";
-    } else {
-        return; // Sentinel-3 has no internal structure avaliable
-    }
-
     if ((*product)->quicklook.isEmpty()) {
         waitForRequest();
 
-            QNetworkRequest quicklookRequest(QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attributes["id"].second
-                                             + "')/Nodes('" + (*product)->attributes["filename"].second + "')/" + platformSpecific + "/$value"));
+            QNetworkRequest quicklookRequest(QUrl("https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attributes["id"].second + "')/Products('Quicklook')/$value"));
             quicklookRequest.setRawHeader("Authorization", "Basic " + QByteArray(QString("%1:%2").arg(username).arg(getPassword()).toUtf8()).toBase64());
 
             QNetworkReply* quicklookReply = networkAccess->get(quicklookRequest);
@@ -266,8 +256,6 @@ void Widget::openProduct(std::shared_ptr<Product*> product) {
                 if (quicklookReply->error() == QNetworkReply::NoError) {
                     (*product)->quicklook = quicklookReply->readAll();
                     (*tab)->updateQuicklook();
-                } else {
-                    QMessageBox::warning(this, "Conenction error", quicklookReply->errorString());
                 }
             });
     } else {
@@ -287,8 +275,6 @@ void Widget::openProduct(std::shared_ptr<Product*> product) {
                 if (manifestReply->error() == QNetworkReply::NoError) {
                     (*product)->manifest = manifestReply->readAll();
                     (*tab)->updateManifest();
-                } else {
-                    QMessageBox::warning(this, "Conenction error", manifestReply->errorString());
                 }
             });
     } else {

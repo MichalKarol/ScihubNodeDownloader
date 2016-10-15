@@ -37,7 +37,7 @@ ProductTab::ProductTab(std::shared_ptr<Product*> product, QWidget *parent) : QWi
     QString metadata;
 
     for (auto i = (*product)->attributes.begin(); i != (*product)->attributes.end(); i++) {
-        metadata.append(i.key() + ":\t" + (*i).second + "\n");
+        metadata.append(i.key() + " " + (*i).first + ":\t" + " " + (*i).second + "\n");
     }
     manifest->setText(metadata);
 
@@ -62,6 +62,12 @@ ProductTab::ProductTab(std::shared_ptr<Product*> product, QWidget *parent) : QWi
 
 void ProductTab::updateManifest() {
     Product::Node*& root = (*product)->root;
+    auto getAttributeIndex = [](QXmlStreamAttributes attributes, QString argName) -> int {
+        for (int i = 0; i < attributes.size(); i++) {
+            if (attributes[i].name() == argName) { return i; }
+        }
+        return -1;
+    };
 
     if ((*product)->root == nullptr) {
         QString url = "https://scihub.copernicus.eu/dhus/odata/v1/Products('" + (*product)->attributes["id"].second
@@ -83,36 +89,46 @@ void ProductTab::updateManifest() {
                 if (reader.name() == "byteStream") {
                     node = new Product::Node;
                     node->directory = false;
-                    node->size = reader.attributes()[1].value().toULong();
+
+                    int sizeIndex = getAttributeIndex(reader.attributes(), "size");
+
+                    if (sizeIndex != -1) { node->size = reader.attributes()[sizeIndex].value().toULong(); }
                 } else if (reader.name() == "fileLocation") {
-                    QStringList path = reader.attributes()[1].value().toString().split("/");
-                    path.removeFirst();
+                    int pathIndex = getAttributeIndex(reader.attributes(), "href");
 
-                    QString localUrl = url;
-                    parentNode = root;
+                    if (pathIndex != -1) {
+                        QStringList path = reader.attributes()[pathIndex].value().toString().split("/");
+                        if (path.size() > 1) {
+                            path.removeFirst();
 
-                    for (int i = 0; i < path.size() - 1; i++) {
-                        localUrl += ("/Nodes('" + path[i] + "')");
+                            QString localUrl = url;
+                            parentNode = root;
 
-                        if (!parentNode->nodes.contains(path[i])) {
-                            Product::Node* tmpNode = new Product::Node;
-                            tmpNode->name = path[i];
-                            tmpNode->href = localUrl;
-                            parentNode->nodes.insert(path[i].toUpper(), tmpNode);
-                            parentNode = tmpNode;
-                        } else {
-                            parentNode = parentNode->nodes[path[i]];
+                            for (int i = 0; i < path.size() - 1; i++) {
+                                localUrl += ("/Nodes('" + path[i] + "')");
+
+                                if (!parentNode->nodes.contains(path[i])) {
+                                    Product::Node* tmpNode = new Product::Node;
+                                    tmpNode->name = path[i];
+                                    tmpNode->href = localUrl;
+                                    parentNode->nodes.insert(path[i].toUpper(), tmpNode);
+                                    parentNode = tmpNode;
+                                } else {
+                                    parentNode = parentNode->nodes[path[i]];
+                                }
+                            }
+
+
+                            node->name = path.last();
+                            node->href = localUrl + ("/Nodes('" + path.last() + "')");
+                            parentNode->nodes.insert(path.last(), node);
                         }
                     }
-
-
-                    node->name = path.last();
-                    node->href = localUrl + ("/Nodes('" + path.last() + "')");
-                    parentNode->nodes.insert(path.last(), node);
-
                 } else if (reader.name() == "checksum") {
+                    int checksumNameIndex = getAttributeIndex(reader.attributes(), "checksumName");
 
-                    if (reader.attributes()[0].value().toString() != "MD5") {
+                    if (checksumNameIndex != -1
+                            && reader.attributes()[checksumNameIndex].value() != "MD5") {
                         qDebug() << "Checksum algorithm different then MD5";
                     }
                     node->checksum = reader.readElementText();
